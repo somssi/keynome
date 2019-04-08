@@ -5,3 +5,4 @@ authors = ["Minhwan Kim <azurelysium@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+statistical = "1.0.0"
