@@ -10,16 +10,21 @@ macro_rules! assert_numerically_similar {
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use std::{thread, time};
 use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
+use std::hash::Hash;
 
 extern crate statistical;
-
-type Digraph = (char, char);
+extern crate serde;
+use serde::{Serialize, Serializer, Deserialize};
 
 pub struct KeyEvent {
     timestamp_ms: u128,
     key: char,
 }
 
+pub type Digraph = (char, char);
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DigraphStats {
     pub size_samples: usize,
     pub mean: f64,
@@ -88,6 +93,33 @@ impl KeystrokeLogger {
             }
         }
 
+        stats
+    }
+
+    pub fn serialize_digraph_statistics(stats: &HashMap<Digraph, DigraphStats>) -> String {
+        let mut str_keyed_map: HashMap<String, String> = HashMap::new();
+        for (k, v) in stats.iter() {
+            let key = format!("{}-{}", k.0, k.1);
+            let value = serde_json::to_string(v).unwrap();
+            str_keyed_map.insert(key, value);
+        }
+        serde_json::to_string(&str_keyed_map).unwrap()
+    }
+
+    pub fn deserialize_digraph_statistics(serialized: &str) -> HashMap<Digraph, DigraphStats> {
+        let mut stats: HashMap<Digraph, DigraphStats> = HashMap::new();
+        let str_keyed_map: HashMap<String, String> = serde_json::from_str(serialized).unwrap();
+
+        for (k, v) in str_keyed_map.iter() {
+            let vec_digraph: Vec<&str> = k.split('-').collect();
+            let vec_k1: Vec<char> = vec_digraph[0].chars().collect();
+            let vec_k2: Vec<char> = vec_digraph[1].chars().collect();
+
+            let digraph = (vec_k1[0], vec_k2[0]);
+            let digraph_stats: DigraphStats = serde_json::from_str(v).unwrap();
+
+            stats.insert(digraph, digraph_stats);
+        }
         stats
     }
 }
@@ -182,5 +214,30 @@ mod tests {
 
         assert_numerically_similar!(0.01, stats[&('f', 'e')].mean, 1250.0);
         assert_numerically_similar!(0.01, stats[&('f', 'e')].std, 1060.66);
+    }
+
+    #[test]
+    fn digraph_statistics_serialization() {
+        let keystrokes = "The most likely way for the world to be destroyed, \
+                          most experts agree, is by accident.  That's where we come in \
+                          we're computer professionals.  We cause accidents. \
+                          - Nathaniel Borenstein";
+
+        let mut kstr = KeystrokeLogger::new();
+        for c in keystrokes.chars() {
+            kstr.add_keystroke(c);
+        }
+
+        let stats = kstr.compute_digraph_statistics();
+
+        let serialized = KeystrokeLogger::serialize_digraph_statistics(&stats);
+        let deserialized = KeystrokeLogger::deserialize_digraph_statistics(&serialized);
+
+        let mut keys_orig: Vec<String> = stats.keys().map(|d| format!("{}-{}", d.0, d.1)).collect();
+        let mut keys_new: Vec<String> = deserialized.keys().map(|d| format!("{}-{}", d.0, d.1)).collect();
+
+        keys_orig.sort();
+        keys_new.sort();
+        assert_eq!(keys_orig, keys_new);
     }
 }
