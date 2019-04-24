@@ -1,7 +1,7 @@
 language: rust
 
 before_install:
-  - curl -L https://github.com/mozilla/grcov/releases/download/v0.4.1/grcov-linux-x86_64.tar.bz2 | tar jxf -
+  - curl -L https://github.com/mozilla/grcov/releases/download/v0.4.3/grcov-linux-x86_64.tar.bz2 | tar jxf -
 
 matrix:
   include:
